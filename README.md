@@ -3,13 +3,13 @@ Let's you view and dump WhatsApp sessions.
 
 This is a personal project and will be extended and optimized in the future.
 
-##Important
+## Important
 This project requires the following modules:
 * Docopt
 * Pandas
 * Yattag
 
-##Usage
+## Usage
 ```
 Usage:
     wad.py dump_chat [<output>] [(--all | --single <sid>)]
