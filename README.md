@@ -10,7 +10,7 @@ This project requires the following modules:
 * Yattag
 
 ##Usage
-```python
+```
 Usage:
     wad.py dump_chat [<output>] [(--all | --single <sid>)]
     wad.py sessions   
