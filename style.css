@@ -1,0 +1,53 @@
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	max-width: 100%;
+}
+
+header {
+	background-color: #075E54;
+	width: 100%;
+	font-size: 18pt;
+	color: #FFF;
+	padding: 10pt 8pt;
+    font-weight: normal;
+}
+
+body {
+	max-width: 100vw;
+	overflow-x: hidden;
+	background: #ECE5DD;
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+p {
+	display: inline-block;
+	background-color: #FFF;
+	color: #000;
+	clear: both;
+	line-height: 18pt;
+	font-size: 15pt;
+	margin: 8pt 5pt;
+	max-width: 80%;
+	word-wrap: break-word;
+	border-radius: 5pt;
+	padding: 8pt;
+	float: left;
+}
+
+p::after {
+	content: attr(data-date);
+	font-size: 13pt;
+    color: #444;
+    display: inline-block;
+	float: right;
+	word-wrap: break-word;
+	margin-left: 5pt;
+	vertical-align: middle;
+}
+
+.host {
+	background-color: #DCF8C6;
+	float: right;
+}
