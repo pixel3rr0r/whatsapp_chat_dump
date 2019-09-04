@@ -57,18 +57,24 @@ timestamp_to_apple = lambda x: (datetime.fromtimestamp(x) + (datetime(2001,1,1) 
 #   DEFINE COMMAND FUNCTIONS   #
 ################################
 
+def list(sid):
+    df = get_df('ZWAMESSAGE')
+
 def dump_chats(output, sid):
     df = get_df('ZWAMESSAGE')
-    chat_list = get_df('ZWACHATSESSION')[~get_df('ZWACHATSESSION').ZCONTACTJID.str.contains('g.us')] # Hide group chats
+    chat_list = get_df('ZWACHATSESSION')[~get_df('ZWACHATSESSION').ZCONTACTJID.str.contains('status')] # Hide status messages
 
     output = os.path.normpath(output)
     
     # Setup yattag, generate HTML
     doc, tag, text, line = Doc().ttl()
 
-    doc.asis('<!DOCTYPE html>')
-
     def generate_html(df):
+        if 'g.us' in df.ZFROMJID[df.ZFROMJID.first_valid_index()]:
+            is_group_chat = True
+        
+        doc.asis('<!DOCTYPE html>')
+        
         for index, row in df.iterrows():
             with tag('html'):
                 with tag('head'):
@@ -83,7 +89,8 @@ def dump_chats(output, sid):
                             elif str(row['ZPUSHNAME']) == 'None':
                                 line('p', row['ZTEXT'], ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])), klass = 'host')
                             else:
-                                line('p', row['ZTEXT'], ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])))
+                                if is_group_chat:
+                                    line('p', row['ZTEXT'], ('data-from', row['ZPUSHNAME']), ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])))
                 doc.asis('<script type="text/javascript" src="main.js"')
             return str(doc.getvalue())
 
@@ -91,7 +98,7 @@ def dump_chats(output, sid):
     try:
         if sid:
             for s in sid:
-                with open(output + '\\' + get_df_by_sid(df, int(s)).ZPUSHNAME.iloc[0] + '.html', 'w+', encoding='utf-8') as c:
+                with open(output + '\\' + chat_list['ZPARTNERNAME'][chat_list.Z_PK == int(s)].iloc[0] + '.html', 'w+', encoding='utf-8') as c:
                     c.write(generate_html(get_df_by_sid(df, int(s))))
                 print('Exported chat ' + str(sid.index(s)+1) + '/' + str(len(sid)))
             print('Done!')
@@ -108,7 +115,7 @@ def dump_chats(output, sid):
 def sessions():
     df = get_df('ZWACHATSESSION')
 
-    df = df[~df.ZCONTACTJID.str.contains('g.us')] # Hide group chats
+    df = df[~df.ZCONTACTJID.str.contains('status')] # Hide status message
 
     # Find chat sessions
     if args['find']:
@@ -141,6 +148,6 @@ if __name__ == '__main__':
         sessions()
     elif args['dump_chats']:
         if args['--cd']:
-            dump_chats(os.getcwd(), args['sid'])
+            dump_chats(os.getcwd(), args['<sid>'])
         else:
             dump_chats(args['<output>'], args['<sid>'])
