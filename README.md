@@ -36,5 +36,5 @@ Options:
 
 ## TODO
 - [X] Add find function
-- [ ] Add group chat support
+- [X] Add group chat support
 - [ ] Add macOS support
