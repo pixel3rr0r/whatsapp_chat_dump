@@ -62,51 +62,77 @@ def list(sid):
 
 def dump_chats(output, sid):
     df = get_df('ZWAMESSAGE')
-    chat_list = get_df('ZWACHATSESSION')[~get_df('ZWACHATSESSION').ZCONTACTJID.str.contains('status')] # Hide status messages
+    media = get_df('ZWAMEDIAITEM')
+    chat_list = get_df('ZWACHATSESSION')[~get_df('ZWACHATSESSION').ZCONTACTJID.str.contains('status')].reset_index() # Hide status messages
 
     output = os.path.normpath(output)
     
     # Setup yattag, generate HTML
-    doc, tag, text, line = Doc().ttl()
 
     def generate_html(df):
+        is_group_chat = False
         if 'g.us' in df.ZFROMJID[df.ZFROMJID.first_valid_index()]:
             is_group_chat = True
-        
+            
+        def is_from_me():
+            if row['ZPUSHNAME']:
+                return False
+            else:
+                return True
+            
+        doc, tag, text, line = Doc().ttl()
         doc.asis('<!DOCTYPE html>')
         
-        for index, row in df.iterrows():
-            with tag('html'):
-                with tag('head'):
-                    doc.asis('<link rel="stylesheet" href="style.css">')
-                with tag('body'):
-                    with tag('header'):
-                        line('h1', df.ZPUSHNAME[df.ZPUSHNAME.first_valid_index()])
-                    with tag('main'):
-                        for index, row in df.iterrows():
-                            if str(row['ZTEXT']) == 'None':
-                                continue
-                            elif str(row['ZPUSHNAME']) == 'None':
-                                line('p', row['ZTEXT'], ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])), klass = 'host')
-                            else:
-                                if is_group_chat:
-                                    line('p', row['ZTEXT'], ('data-from', row['ZPUSHNAME']), ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])))
-                doc.asis('<script type="text/javascript" src="main.js"')
-            return str(doc.getvalue())
+        with tag('head'):
+            doc.asis('<link rel="stylesheet" href="style.css">')
+        with tag('body'):
+            with tag('header'):
+                line('h1', chat_list['ZPARTNERNAME'][chat_list.Z_PK == df.ZCHATSESSION.iloc[0]].iloc[0])
+            with tag('main'):
+                for index, row in df.iterrows():
+                    if (str(row['ZTEXT']) == 'None') and pd.isna(row['ZMEDIAITEM']):
+                        continue
+                    elif not pd.isna(row['ZMEDIAITEM']):
+                        try:
+                            #   AUDIO
+                            if '.caf' in media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0]:
+                                if is_from_me():
+                                    line('p', '(Voice Message)', ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])), klass=('system host' if is_from_me() else 'system'))
+                            #   IMAGES
+                            elif '.jpg' in media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0]:
+                                with tag('div', klass=('thumbnail host' if is_from_me() else 'thumbnail')):
+                                    doc.stag('img', src=media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0].lower().strip('/'), alt='COULD NOT LOAD IMAGE')
+                            #   VIDEO
+                            elif '.mp4' in media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0]:
+                                with tag('div', klass=('thumbnail host' if is_from_me() else 'thumbnail')):
+                                    with tag('video', controls='true'):
+                                        doc.stag('source', src=media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0].lower().strip('/'), type='video/mp4')
+                                        doc.asis('Your browser does not support videos :(')
+                        except TypeError:
+                            line('p', 'This message has been deleted', klass='system')
+                    elif is_from_me():
+                        line('p', row['ZTEXT'], ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])), klass = 'host')
+                    else:
+                        line('p', row['ZTEXT'], (('data-from', row['ZPUSHNAME']) if is_group_chat() else ''), ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])))
+        doc.asis('<script type="text/javascript" src="main.js"')
+        return str(doc.getvalue())
 
     # Export to output
     try:
         if sid:
             for s in sid:
-                with open(output + '\\' + chat_list['ZPARTNERNAME'][chat_list.Z_PK == int(s)].iloc[0] + '.html', 'w+', encoding='utf-8') as c:
+                with open(output + '\\' + chat_list['ZPARTNERNAME'][chat_list.Z_PK == int(s)].iloc[0] + ' (' + chat_list['ZCONTACTJID'][chat_list.Z_PK == int(s)].iloc[0].split('@')[0] + ')' + '.html', 'w+', encoding='utf-8') as c:
                     c.write(generate_html(get_df_by_sid(df, int(s))))
                 print('Exported chat ' + str(sid.index(s)+1) + '/' + str(len(sid)))
-            print('Done!')
         else:
             for index, row in chat_list.iterrows():
-                with open(output + '\\' + row['ZPARTNERNAME'] + '.html', 'w+', encoding='utf-8') as c:
-                    c.write(generate_html(get_df_by_sid(df, row['Z_PK'])))
-                print('Exported chat ' + str(index) + '/' + str(len(chat_list)))
+                try:
+                    with open(output + '\\' + row['ZPARTNERNAME'] + ' (' + row['ZCONTACTJID'].split('@')[0] + ')' + '.html', 'w+', encoding='utf-8') as c:
+                        c.write(generate_html(get_df_by_sid(df, row['Z_PK'])))
+                except KeyError:
+                    print('Skipped chat #' + str(index+1) + ' (' + str(row['ZPARTNERNAME']) + ')')
+                print('Exported chat ' + str(index+1) + '/' + str(len(chat_list)))
+        print('Done!')
     except FileNotFoundError:
         print('Uh-oh! Looks like the path you\'ve entered is incorrect... Try again!')
     except KeyboardInterrupt:
@@ -149,5 +175,5 @@ if __name__ == '__main__':
     elif args['dump_chats']:
         if args['--cd']:
             dump_chats(os.getcwd(), args['<sid>'])
-        else:
+        elif args['<output>']:
             dump_chats(args['<output>'], args['<sid>'])
