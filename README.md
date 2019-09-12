@@ -1,6 +1,10 @@
 # whatsapp_chat_dump
-A small script for listing and exporting WhatsApp chat sessions. Exporting group chats is not supported (yet).
-This is a personal project and will be extended and optimized in the future.
+A small script for listing and exporting WhatsApp chat sessions into a readable HTML-File. It can now export
+* Texts,
+* Images and
+* Videos.
+
+If requested, I will add voice message support aswell.
 
 ## Important
 This project requires the following modules:
@@ -8,7 +12,7 @@ This project requires the following modules:
 * Pandas
 * Yattag
 
-Furthermore, the ChatStorage.sqlite file (the WhatsApp Chat database) must be in the same directory.
+Furthermore, **the ChatStorage.sqlite file (the WhatsApp Chat database) and the media folder** must be in the same directory.
 
 ## Usage
 ```
@@ -37,4 +41,8 @@ Options:
 ## TODO
 - [X] Add find function
 - [X] Add group chat support
-- [ ] Add macOS support
+- [X] Add media support (images, videos)
+- [ ] Add macOS support*
+- [ ] Automatically export the database and media from a backup file*
+
+*\*Only if requested*
