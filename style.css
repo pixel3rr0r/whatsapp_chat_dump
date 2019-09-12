@@ -21,17 +21,22 @@ body {
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+.thumbnail,
 p {
 	display: inline-block;
-	background-color: #FFF;
-	color: #000;
+	background: #FFF;
+	max-width: 60%;
+	float: left;
 	clear: both;
+	margin: 8pt 5pt;
+	border-radius: 8pt;
+}
+
+
+p {
 	line-height: 18pt;
 	font-size: 15pt;
-	margin: 8pt 5pt;
-	max-width: 80%;
 	word-wrap: break-word;
-	border-radius: 5pt;
 	padding: 8pt;
 	float: left;
 }
@@ -59,5 +64,47 @@ p::after {
 
 .host {
 	background-color: #DCF8C6;
-	float: right;
+	float: right!important;
+}
+
+.system {
+	font-size: 12pt;
+	color: #AAA;
+}
+
+.system::after {
+	color: #AAA;
+}
+
+.thumbnail {
+	display: inline-block;
+	position: relative;
+	width: 300pt;
+	height: 300pt;
+	border-radius: 5pt;
+	padding: 8pt;
+	clear: both;
+	float: left;
+	overflow: hidden;
+	border: 4pt solid #FFF;
+	background-color: #000;
+	transition: all .3s ease-in-out .3s;
+}
+
+.thumbnail img,
+.thumbnail video {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	height: 100%;
+	max-width: auto;
+	-webkit-transform: translate(-50%,-50%);
+		-ms-transform: translate(-50%,-50%);
+			transform: translate(-50%,-50%);
+}
+
+.thumbnail:hover {
+	width: 95%;
+	max-width: 95%;
+	height: 90vh;
 }
