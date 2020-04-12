@@ -37,12 +37,3 @@ Options:
     --sort             Sorts the list alphabetically
     -h --help          Shows this help message
 ```
-
-## TODO
-- [X] Add find function
-- [X] Add group chat support
-- [X] Add media support (images, videos)
-- [ ] Add macOS support*
-- [ ] Automatically export the database and media from a backup file*
-
-*\*Only if requested*
