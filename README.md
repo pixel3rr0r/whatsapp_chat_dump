@@ -6,6 +6,16 @@ A small script for listing and exporting WhatsApp chat sessions into a readable 
 
 If requested, I will add voice message support aswell.
 
+## NOTICE
+As of now, I am working on a rewrite, which includes several new features, including
+* Export to JSON, HTML, TXT, etc.
+* Support for texts, imagesm, videos and voice messages
+* Support for group chats
+* Support for Hyperlinks
+* ... and more.
+
+Since I'm working on it in my free time, there is no fixed date for when it will be finished.
+
 ## Important
 This project requires the following modules:
 * Docopt
