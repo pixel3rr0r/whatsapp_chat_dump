@@ -1,6 +1,6 @@
-"""                 _               
-                | |              
- _ _ _ _____  __| |  ____  _   _ 
+"""                 _
+                | |
+ _ _ _ _____  __| |  ____  _   _
 | | | (____ |/ _  | |  _ \| | | |
 | | | / ___ ( (_| |_| |_| | |_| |
  \___/\_____|\____(_)  __/ \__  |
@@ -11,37 +11,26 @@ Exporting group chats is not supported (yet).
 The ChatStorage.sqlite must be in the same directory.
 
 Usage:
-    wad.py dump_chats [--cd | <output>] [--all | --custom <sid>...]
-    wad.py sessions [(find (--name <name> | --number <number>))] [--sort]
+    wad.py dump [--dms | --groups]
+    wad.py sessions
     wad.py -h | --help
 
-Examples:
-    wad.py dump_chats --custom 7 11 420
-    wad.py dump_chats "C:/Users/pixel3rr0r/Documents/Exported Chats"
-    wad.py sessions --sort
-    wad.py sessions find --name "Niels Bohr"
-
 Options:
-    --cd               Exports chats to the current directory (Default)
-    --all              Exports every chat (Default)
-    --custom           Exports one or more (seperated by space) given chat sessions
-    --name             Finds all chat sessions with the given name
-    --number           Finds all chat sessions with the given number
-    --sid              Finds all chat sessions with the given Session-ID
-    --sort             Sorts the list alphabetically
     -h --help          Shows this help message
 """
 
-from docopt import docopt
 import pandas as pd
-import sqlite3, os
+import sqlite3
+import json
+import os
 from datetime import datetime
-from yattag import Doc
+
+from docopt import docopt
 
 
-##############################
-#   DEFINE BASIC FUNCTIONS   #
-##############################
+############################################
+#   DEFINE BASIC FUNCTIONS AND VARIABLES   #
+############################################
 
 def get_df(table):
     con = sqlite3.connect('ChatStorage.sqlite')
@@ -52,113 +41,81 @@ def get_df(table):
 get_df_by_sid = lambda df, sid: df[df.ZCHATSESSION == sid]
 timestamp_to_apple = lambda x: (datetime.fromtimestamp(x) + (datetime(2001,1,1) - datetime(1970, 1, 1))).strftime('%d %B %Y - %H:%M')
 
+chats = get_df('ZWAMESSAGE')
+sessions = get_df('ZWACHATSESSION')[get_df('ZWACHATSESSION')['ZSESSIONTYPE'] != 3]
+sessions = sessions[sessions['ZFLAGS'] != 1304].reset_index()
 
 ################################
 #   DEFINE COMMAND FUNCTIONS   #
 ################################
 
-def list(sid):
-    df = get_df('ZWAMESSAGE')
+def df_to_JSON(df):
+    return json.loads(df[['ZISFROMME', 'ZMESSAGEDATE', 'ZPUSHNAME', 'ZTEXT', 'ZMEDIAITEM', 'ZMESSAGETYPE']].to_json(orient='records'))
 
-def dump_chats(output, sid):
-    df = get_df('ZWAMESSAGE')
-    media = get_df('ZWAMEDIAITEM')
-    chat_list = get_df('ZWACHATSESSION')[~get_df('ZWACHATSESSION').ZCONTACTJID.str.contains('status')].reset_index() # Hide status messages
+def export_to_TXT():
+    for index, session in sessions.iterrows():
+        chat = df_to_JSON(get_df_by_sid(chats, session['Z_PK']))
+        partner = session['ZPARTNERNAME']
+        dir = os.getcwd() + '\\chats\\'
+        with open(dir + session['ZPARTNERNAME'] + '.txt', 'w+', encoding='utf-8') as file:
+            for message in chat:
+                if message['ZISFROMME'] == 0 and not message['ZTEXT'] and not message['ZMEDIAITEM'] or message['ZMESSAGETYPE'] == 6:
+                    continue
+                if message['ZTEXT'] and message['ZMEDIAITEM']:
+                    msg = f"[ MEDIA ] {message['ZTEXT']}"
+                elif message['ZMEDIAITEM']:
+                    msg = "[ MEDIA ]"
+                else:
+                    msg = message['ZTEXT']
 
-    output = os.path.normpath(output)
-    
-    # Setup yattag, generate HTML
+                if session['ZSESSIONTYPE'] == 1:
+                    partner = message['ZPUSHNAME']
 
-    def generate_html(df):
-        is_group_chat = False
-        if 'g.us' in df.ZFROMJID[df.ZFROMJID.first_valid_index()]:
-            is_group_chat = True
-            
-        def is_from_me():
-            if row['ZPUSHNAME']:
-                return False
-            else:
-                return True
-            
-        doc, tag, text, line = Doc().ttl()
-        doc.asis('<!DOCTYPE html>')
-        
-        with tag('head'):
-            doc.asis('<link rel="stylesheet" href="style.css">')
-        with tag('body'):
-            with tag('header'):
-                line('h1', chat_list['ZPARTNERNAME'][chat_list.Z_PK == df.ZCHATSESSION.iloc[0]].iloc[0])
-            with tag('main'):
-                for index, row in df.iterrows():
-                    if (str(row['ZTEXT']) == 'None') and pd.isna(row['ZMEDIAITEM']):
-                        continue
-                    elif not pd.isna(row['ZMEDIAITEM']):
-                        try:
-                            #   AUDIO
-                            if '.caf' in media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0]:
-                                if is_from_me():
-                                    line('p', '(Voice Message)', ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])), klass=('system host' if is_from_me() else 'system'))
-                            #   IMAGES
-                            elif '.jpg' in media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0]:
-                                with tag('div', klass=('thumbnail host' if is_from_me() else 'thumbnail')):
-                                    doc.stag('img', src=media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0].lower().strip('/'), alt='COULD NOT LOAD IMAGE')
-                            #   VIDEO
-                            elif '.mp4' in media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0]:
-                                with tag('div', klass=('thumbnail host' if is_from_me() else 'thumbnail')):
-                                    with tag('video', controls='true'):
-                                        doc.stag('source', src=media['ZMEDIALOCALPATH'][media.Z_PK == int(row['ZMEDIAITEM'])].iloc[0].lower().strip('/'), type='video/mp4')
-                                        doc.asis('Your browser does not support videos :(')
-                        except TypeError:
-                            line('p', 'This message has been deleted', klass='system')
-                    elif is_from_me():
-                        line('p', row['ZTEXT'], ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])), klass = 'host')
-                    else:
-                        line('p', row['ZTEXT'], (('data-from', row['ZPUSHNAME']) if is_group_chat() else ''), ('data-date', timestamp_to_apple(row['ZMESSAGEDATE'])))
-        doc.asis('<script type="text/javascript" src="main.js"')
-        return str(doc.getvalue())
+                author = partner if message['ZPUSHNAME'] else "Me"
+                file.write(f'[{timestamp_to_apple(message["ZMESSAGEDATE"])}] {author}: {msg}\n')
 
-    # Export to output
-    try:
-        if sid:
-            for s in sid:
-                with open(output + '\\' + chat_list['ZPARTNERNAME'][chat_list.Z_PK == int(s)].iloc[0] + ' (' + chat_list['ZCONTACTJID'][chat_list.Z_PK == int(s)].iloc[0].split('@')[0] + ')' + '.html', 'w+', encoding='utf-8') as c:
-                    c.write(generate_html(get_df_by_sid(df, int(s))))
-                print('Exported chat ' + str(sid.index(s)+1) + '/' + str(len(sid)))
-        else:
-            for index, row in chat_list.iterrows():
-                try:
-                    with open(output + '\\' + row['ZPARTNERNAME'] + ' (' + row['ZCONTACTJID'].split('@')[0] + ')' + '.html', 'w+', encoding='utf-8') as c:
-                        c.write(generate_html(get_df_by_sid(df, row['Z_PK'])))
-                except KeyError:
-                    print('Skipped chat #' + str(index+1) + ' (' + str(row['ZPARTNERNAME']) + ')')
-                print('Exported chat ' + str(index+1) + '/' + str(len(chat_list)))
-        print('Done!')
-    except FileNotFoundError:
-        print('Uh-oh! Looks like the path you\'ve entered is incorrect... Try again!')
-    except KeyboardInterrupt:
-        print('\nExport cancelled!')
+def getChats():
+    dm_list = []
+    group_list = []
 
-def sessions():
-    df = get_df('ZWACHATSESSION')
+    # Get sessions
+    for index, row in sessions.iterrows():
+        if row['ZSESSIONTYPE'] == 1:
+            glist = {}
+            glist['sid'] = row['Z_PK']
+            glist['name'] = row['ZPARTNERNAME']
+            glist['messages'] = str(row['ZMESSAGECOUNTER'])
+            ppname = get_df('ZWAPROFILEPUSHNAME')
+            memberlist = []
+            for index, member in get_df_by_sid(get_df('ZWAGROUPMEMBER'), row['Z_PK']).iterrows():
+                member_id = member['ZMEMBERJID']
+                for i, r in ppname.iterrows():
+                    if r['ZJID'] == member_id:
+                        member_id = r['ZPUSHNAME']
+                        break
+                memberlist.append(member_id)
+            glist['members'] = memberlist
+            group_list.append(glist)
+        elif row['ZSESSIONTYPE'] == 0:
+            slist = {}
+            slist['sid'] = row['Z_PK']
+            slist['name'] = row['ZPARTNERNAME']
+            slist['number'] = "+{} {}".format(row['ZCONTACTJID'].split('@')[0][:2],row['ZCONTACTJID'].split('@')[0][2:])
+            slist['messages'] = str(row['ZMESSAGECOUNTER'])
+            dm_list.append(slist)
+    return {'dm': dm_list, 'group': group_list}
 
-    df = df[~df.ZCONTACTJID.str.contains('status')] # Hide status message
-
-    # Find chat sessions
-    if args['find']:
-        if args['--name']:
-            df = df[df.ZPARTNERNAME.str.lower().str.contains(args['<name>'].lower())].fillna(False)
-            print('Found', len(df), 'chat sessions with', args['<name>'])
-        elif args['--number']:
-            df = df[df.ZCONTACTJID.str.contains(args['<number>'])].fillna(False)
-            print('Found', len(df), 'chat sessions with', args['<number>'])
-
-    if args['--sort']:
-        df = df.sort_values(by='ZPARTNERNAME')
-
-    df['ZCONTACTJID'] = df['ZCONTACTJID'].str.split('@').str[0]
-    df = df.rename(columns={'ZPARTNERNAME': 'NAME', 'ZCONTACTJID': 'NUMBER', 'Z_PK': 'SID'})
-
-    if not df.empty: print(df[['NAME', 'NUMBER', 'SID']])
+def list_all():
+    chats = getChats()
+    dms = chats['dm']
+    groups = chats['group']
+    for group in groups:
+        group['members'] = ', '.join(group['members'])
+    print(f'\n[ Found {len(dms)} DMs and {len(groups)} group chats. ]\n')
+    print('DMs:')
+    print(pd.DataFrame(dms).to_string(index=False))
+    print('\nGroup Chats:')
+    print(pd.DataFrame(groups).to_string(index=False))
 
 
 ######################
@@ -166,14 +123,11 @@ def sessions():
 ######################
 
 if __name__ == '__main__':
-    args = docopt(__doc__, version='WhatsAppDump 1.1.0')
+    args = docopt(__doc__, version='WhatsAppDump 2.0.0-dev')
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_rows', None)
-    
+
     if args['sessions']:
-        sessions()
-    elif args['dump_chats']:
-        if args['--cd']:
-            dump_chats(os.getcwd(), args['<sid>'])
-        elif args['<output>']:
-            dump_chats(args['<output>'], args['<sid>'])
+        list_all()
+    elif args['dump']:
+        export_to_TXT()
